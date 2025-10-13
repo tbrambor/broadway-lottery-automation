@@ -12,7 +12,7 @@ const stealth = stealthPlugin();
 chromium.use(stealth);
 
 const urls = [
-  "https://lottery.broadwaydirect.com/show/lesmis-la/",
+  // "https://lottery.broadwaydirect.com/show/lesmis-la/",
   // "https://lottery.broadwaydirect.com/show/aladdin/",
   // "https://lottery.broadwaydirect.com/show/mj-ny/",
   // "https://lottery.broadwaydirect.com/show/shucked-ny/",
