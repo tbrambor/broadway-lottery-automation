@@ -3,6 +3,7 @@ on:
   schedule:
     # Run every day at 01:32 UTC
     - cron: "32 1 * * *"
+  workflow_dispatch:
 jobs:
   test:
     timeout-minutes: 60
