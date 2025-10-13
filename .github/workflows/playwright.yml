@@ -1,22 +1,33 @@
 name: Playwright Tests
 on:
   schedule:
-    # Run every day at 01:32 UTC
-    - cron: "32 1 * * *"
-  workflow_dispatch:
+    # Run every day at 01:26 UTC
+    - cron: "26 1 * * *"
+  workflow_dispatch: # allows manual runs for debugging
+
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      # ✅ Use latest checkout action (v4)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ✅ Use latest setup-node action (v4)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20 # Node 18 is EOL in 2025; use 20 (LTS)
+          cache: "npm"
+
       - name: Install dependencies
         run: npm ci
-      - name: Install Playwright Browsers
+
+      - name: Install Playwright browsers
         run: npx playwright install --with-deps
+
       - name: Run Playwright tests
         env:
           FIRST_NAME: ${{ secrets.FIRST_NAME }}
@@ -29,9 +40,14 @@ jobs:
           ZIP: ${{ secrets.ZIP }}
           COUNTRY: ${{ secrets.COUNTRY }}
         run: xvfb-run npx playwright test
-      - uses: actions/upload-artifact@v4
+
+      # ✅ Upload artifact with v4 (faster, resumable uploads)
+      - name: Upload Playwright report
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+          compression-level: 6 # optional: balance speed vs. size
+          overwrite: true # replace if name already exists
