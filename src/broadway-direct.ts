@@ -36,8 +36,32 @@ export async function broadwayDirect({ browser, userInfo, url }) {
     // Agree to terms
     await page.locator("#dlslot_agree").check({ force: true });
 
-    // Submit the form
-    await page.getByLabel("Enter").click();
+    // Handle cookie consent banner if present
+    const cookieBanner = page.locator("#cookie-information-template-wrapper");
+    const isCookieBannerVisible = await cookieBanner.isVisible().catch(() => false);
+    if (isCookieBannerVisible) {
+      // Try to find and click an accept/agree button within the cookie banner
+      const acceptButton = cookieBanner.getByRole("button", { name: /accept|agree|ok|got it/i });
+      const acceptButtonVisible = await acceptButton.isVisible().catch(() => false);
+      if (acceptButtonVisible) {
+        await acceptButton.click();
+        // Wait for banner to disappear
+        await cookieBanner.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+      } else {
+        // If no explicit button, try to dismiss by clicking outside or waiting
+        // Some banners auto-dismiss or can be closed by clicking backdrop
+        await page.waitForTimeout(1000);
+      }
+    }
+
+    // Submit the form - use force: true if cookie banner still blocks it
+    const enterButton = page.getByLabel("Enter");
+    try {
+      await enterButton.click({ timeout: 10000 });
+    } catch (error) {
+      // If click fails due to interception, force the click
+      await enterButton.click({ force: true });
+    }
 
     // Wait for a random timeout to avoid spamming the API
     const breakTime = Math.floor(Math.random() * 1000) + 1;
