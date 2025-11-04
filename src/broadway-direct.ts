@@ -1,7 +1,7 @@
 export async function broadwayDirect({ browser, userInfo, url }) {
   const page = await browser.newPage();
 
-  await page.goto(url);
+  await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
 
   const links = await page.getByRole("link", { name: /Enter/i }).all();
   const hrefs = await Promise.all(
@@ -13,8 +13,9 @@ export async function broadwayDirect({ browser, userInfo, url }) {
     if (!href) {
       continue;
     }
-    await page.goto(href);
+    await page.goto(href, { waitUntil: "networkidle", timeout: 60000 });
 
+    await page.getByLabel("First Name").waitFor({ timeout: 30000 });
     await page.getByLabel("First Name").fill(userInfo.firstName);
     await page.getByLabel("Last Name").fill(userInfo.lastName);
     await page
