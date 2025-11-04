@@ -23,12 +23,25 @@ const urls = [
 ];
 
 urls.forEach((url) => {
-  test(`Sign up at ${url}`, async () => {
+  test(`Sign up at ${url}`, async ({}, testInfo) => {
+    const showName =
+      url.split("/show/")[1]?.replace(/-/g, " ").replace(/\//g, "") || url;
+    console.log(`\n🎭 Starting lottery signup for: ${showName}`);
+    console.log(`   URL: ${url}`);
+
     const userInfo = getUserInfo(process.env);
     // Use headless mode in CI environment
     const browser = await chromium.launch({
       headless: process.env.CI ? true : false,
     });
-    await broadwayDirect({ browser, userInfo, url });
+
+    try {
+      await broadwayDirect({ browser, userInfo, url });
+      console.log(`✅ Successfully completed lottery signup for: ${showName}`);
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
+    }
   });
 });

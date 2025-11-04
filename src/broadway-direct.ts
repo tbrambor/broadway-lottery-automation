@@ -43,6 +43,4 @@ export async function broadwayDirect({ browser, userInfo, url }) {
     const breakTime = Math.floor(Math.random() * 1000) + 1;
     await page.waitForTimeout(breakTime);
   }
-
-  await browser.close();
 }
