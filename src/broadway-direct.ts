@@ -1,21 +1,108 @@
-export async function broadwayDirect({ browser, userInfo, url }) {
+export type LotteryResult = {
+  success: boolean;
+  message: string;
+  reason?: "closed" | "no_entries" | "submitted" | "failed" | "error";
+};
+
+export async function broadwayDirect({ browser, userInfo, url }): Promise<LotteryResult> {
   const page = await browser.newPage();
 
   await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
 
+  // Check for "Enter Now" or "Enter" links - these indicate open lotteries
   const links = await page.getByRole("link", { name: /Enter/i }).all();
+  console.log(`🔍 Found ${links.length} "Enter" link(s) on the page`);
+  
   const hrefs = await Promise.all(
     links.map((link) => link.getAttribute("href"))
-  );
+  ).catch(() => []);
 
-  for (let i = 0; i < hrefs.length; i++) {
-    const href = hrefs[i];
+  // Filter out null/empty hrefs
+  const validHrefs = hrefs.filter((href) => href && href.trim() !== "");
+  console.log(`🔍 Found ${validHrefs.length} valid entry link(s) after filtering`);
+
+  if (validHrefs.length === 0) {
+    // Check page content to see if all lotteries are closed
+    const pageText = await page.textContent("body").catch(() => "");
+    const lowerText = (pageText || "").toLowerCase();
+    
+    // Check for closed lottery indicators in the page
+    const hasClosedStatus = 
+      lowerText.includes("closed") && 
+      (lowerText.includes("lottery status") || lowerText.includes("status"));
+    
+    // Check if there are any "Upcoming" or "Opens" entries
+    const hasUpcoming = 
+      lowerText.includes("upcoming") || 
+      lowerText.includes("opens") ||
+      lowerText.includes("open now");
+
+    console.log(`🔍 Page analysis: hasClosedStatus=${hasClosedStatus}, hasUpcoming=${hasUpcoming}`);
+
+    if (hasClosedStatus && !hasUpcoming) {
+      console.log("ℹ️  All lotteries are closed - no entry links available");
+      await page.close();
+      return {
+        success: false,
+        message: "All lotteries are closed",
+        reason: "closed",
+      };
+    } else {
+      console.log("ℹ️  No entry links found - lottery may be closed or not available");
+      await page.close();
+      return {
+        success: false,
+        message: "No entry links found",
+        reason: "no_entries",
+      };
+    }
+  }
+
+  console.log(`✅ Found ${validHrefs.length} open lottery entry link(s) - proceeding with submission`);
+
+  let submissionSuccess = false;
+  let submissionError: string | undefined;
+  let allEntriesClosed = true;
+  let attemptedSubmissions = 0;
+
+  for (let i = 0; i < validHrefs.length; i++) {
+    const href = validHrefs[i];
     if (!href) {
       continue;
     }
     await page.goto(href, { waitUntil: "networkidle", timeout: 60000 });
 
-    await page.getByLabel("First Name").waitFor({ timeout: 30000 });
+    // Check if lottery is closed on the form page
+    const formPageText = await page.textContent("body").catch(() => "");
+    const lowerFormText = (formPageText || "").toLowerCase();
+    
+    const isFormPageClosed = 
+      lowerFormText.includes("lottery is closed") ||
+      lowerFormText.includes("lottery has closed") ||
+      lowerFormText.includes("no longer accepting entries") ||
+      lowerFormText.includes("entries are closed") ||
+      lowerFormText.includes("lottery closed") ||
+      lowerFormText.includes("entry period has ended");
+
+    if (isFormPageClosed) {
+      console.log("ℹ️  Lottery is closed on form page - skipping entry");
+      continue;
+    }
+
+    // Check if form fields are available (if not, lottery might be closed)
+    const firstNameField = page.getByLabel("First Name");
+    const isFormAvailable = await firstNameField.isVisible({ timeout: 5000 }).catch(() => false);
+    
+    if (!isFormAvailable) {
+      console.log("ℹ️  Form is not available - lottery may be closed");
+      continue;
+    }
+
+    // If we get here, we found an open entry form
+    allEntriesClosed = false;
+    attemptedSubmissions++;
+
+    await firstNameField.waitFor({ timeout: 30000 });
     await page.getByLabel("First Name").fill(userInfo.firstName);
     await page.getByLabel("Last Name").fill(userInfo.lastName);
     await page
@@ -292,8 +379,56 @@ export async function broadwayDirect({ browser, userInfo, url }) {
       }
     }
 
+    // Determine if this submission was successful
+    const wasSuccessful = 
+      response !== null && 
+      (hasSuccessIndicator || 
+       (response.status() >= 200 && response.status() < 300));
+
+    if (wasSuccessful) {
+      submissionSuccess = true;
+    } else if (!submissionSuccess) {
+      // Only set error if we haven't had a success yet
+      if (hasErrorIndicator) {
+        const errorText = await errorIndicators[0]
+          .first()
+          .textContent()
+          .catch(() => "Unknown error");
+        submissionError = errorText;
+      } else if (!response) {
+        submissionError = "No form submission response detected";
+      } else {
+        submissionError = "Form submission may have failed";
+      }
+    }
+
     // Wait for a random timeout to avoid spamming the API
     const breakTime = Math.floor(Math.random() * 1000) + 1;
     await page.waitForTimeout(breakTime);
+  }
+
+  await page.close();
+
+  // If all entries were closed, return closed status
+  if (allEntriesClosed && attemptedSubmissions === 0) {
+    return {
+      success: false,
+      message: "All lottery entries are closed",
+      reason: "closed",
+    };
+  }
+
+  if (submissionSuccess) {
+    return {
+      success: true,
+      message: "Lottery entry submitted successfully",
+      reason: "submitted",
+    };
+  } else {
+    return {
+      success: false,
+      message: submissionError || "Failed to submit lottery entry",
+      reason: "failed",
+    };
   }
 }

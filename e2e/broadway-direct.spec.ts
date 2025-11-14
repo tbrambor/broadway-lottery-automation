@@ -36,8 +36,17 @@ urls.forEach((url) => {
     });
 
     try {
-      await broadwayDirect({ browser, userInfo, url });
-      console.log(`✅ Successfully completed lottery signup for: ${showName}`);
+      const result = await broadwayDirect({ browser, userInfo, url });
+      
+      if (result.success) {
+        console.log(`✅ Successfully completed lottery signup for: ${showName}`);
+      } else if (result.reason === "closed") {
+        console.log(`ℹ️  Lottery is closed for: ${showName} - ${result.message}`);
+      } else if (result.reason === "no_entries") {
+        console.log(`ℹ️  No entry links found for: ${showName} - ${result.message}`);
+      } else {
+        console.log(`❌ Failed to submit lottery entry for: ${showName} - ${result.message}`);
+      }
     } finally {
       if (browser) {
         await browser.close();
