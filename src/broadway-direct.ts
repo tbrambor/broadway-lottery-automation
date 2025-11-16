@@ -362,9 +362,9 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
           try {
             await navigationPromise;
             console.log(`✅ Navigated to popup URL: ${page.url()}`);
-            // Wait for page to load
-            await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-            await page.waitForTimeout(1000);
+            // Wait for page to load (shorter timeout, just wait for DOM to be ready)
+            await page.waitForLoadState("domcontentloaded", { timeout: 5000 }).catch(() => {});
+            await page.waitForTimeout(500);
           } catch {
             // Navigation didn't happen, might be a modal instead
           }
@@ -410,11 +410,11 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
             const fullUrl = triggerHref.startsWith("http") 
               ? triggerHref 
               : new URL(triggerHref, page.url()).toString();
-            await page.goto(fullUrl, { waitUntil: "networkidle", timeout: 60000 });
-            await page.waitForTimeout(1000);
+            await page.goto(fullUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+            await page.waitForTimeout(500);
           } else if (i < validHrefs.length && validHrefs[i]) {
-            await page.goto(validHrefs[i]!, { waitUntil: "networkidle", timeout: 60000 });
-            await page.waitForTimeout(1000);
+            await page.goto(validHrefs[i]!, { waitUntil: "domcontentloaded", timeout: 60000 });
+            await page.waitForTimeout(500);
           } else {
             continue;
           }
@@ -481,7 +481,8 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
       // Handle cookie consent that might appear in the modal (do this after form is visible)
       await handleCookieConsent(page);
 
-    await firstNameField.waitFor({ timeout: 30000 });
+    // We already checked if the field is visible above, so just wait briefly for it to be ready
+    await firstNameField.waitFor({ state: "visible", timeout: 5000 });
     await page.getByLabel("First Name").fill(userInfo.firstName);
     await page.getByLabel("Last Name").fill(userInfo.lastName);
     await page
@@ -775,22 +776,22 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
 
           return isFormSubmission;
         },
-        { timeout: 30000 }
+        { timeout: 15000 }  // Reduced from 30s to 15s
       )
           .catch(() => null),
         // Strategy 2: Wait for navigation (form might cause page change)
         page
-          .waitForURL((url) => url !== formUrl, { timeout: 30000 })
+          .waitForURL((url) => url !== formUrl, { timeout: 10000 })  // Reduced from 30s to 10s
           .then(() => {
             console.log(`📡 Navigation detected after form submission`);
             return { navigation: true, url: page.url() };
           })
           .catch(() => null),
-        // Strategy 3: Wait for success message to appear in DOM
+        // Strategy 3: Wait for success message to appear in DOM (shorter timeout)
         page
           .waitForSelector(
             '[class*="success"], [class*="alert-success"], [id*="success"], [class*="thank"], [class*="entered"]',
-            { timeout: 30000 }
+            { timeout: 5000 }
           )
           .then(() => {
             console.log(`📡 Success indicator appeared in DOM`);
@@ -842,9 +843,15 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
       }
     }
 
-    // Wait for form submission response
-    const response = await formSubmissionPromise;
-      let hasSubmissionIndicator = false;
+    // Wait for form submission response (with a reasonable timeout)
+    const response = await Promise.race([
+      formSubmissionPromise,
+      // Add a maximum wait time to prevent hanging
+      new Promise((resolve) => setTimeout(() => resolve(null), 15000))
+    ]);
+    
+    let hasSubmissionIndicator = false;
+    let wasSuccessful = false;
     
     if (response) {
       // Check what type of response we got
@@ -852,30 +859,41 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
         // Navigation-based detection
         console.log(`✅ Form submission completed: Navigation to ${response.url || 'new page'}`);
         hasSubmissionIndicator = true;
+        wasSuccessful = true;
       } else if (response instanceof Object && 'domChange' in response) {
         // DOM change-based detection
         console.log(`✅ Form submission completed: Success indicator appeared in DOM`);
         hasSubmissionIndicator = true;
+        wasSuccessful = true;
       } else if (response && typeof response.request === 'function') {
         // Network response-based detection
-      console.log(
-        `✅ Form submission completed: ${response.request().method()} ${response.status()} ${response.url()}`
-      );
+        const status = response.status();
+        const method = response.request().method();
+        const responseUrl = response.url();
+        
+        console.log(
+          `✅ Form submission response received: ${method} ${status} ${responseUrl}`
+        );
         hasSubmissionIndicator = true;
-      
-      // Check response body for success/error indicators
-      try {
-        const responseBody = await response.text();
-        if (responseBody) {
-          const lowerBody = responseBody.toLowerCase();
-          if (lowerBody.includes("error") || lowerBody.includes("invalid") || lowerBody.includes("failed")) {
-            console.warn(`⚠️  Response body suggests error: ${responseBody.substring(0, 300)}`);
-          } else if (lowerBody.includes("success") || lowerBody.includes("entered") || lowerBody.includes("thank")) {
-            console.log(`✅ Response body suggests success`);
+        
+        // Consider 2xx and 3xx responses as successful
+        wasSuccessful = status >= 200 && status < 400;
+        
+        // Check response body for success/error indicators
+        try {
+          const responseBody = await response.text();
+          if (responseBody) {
+            const lowerBody = responseBody.toLowerCase();
+            if (lowerBody.includes("error") || lowerBody.includes("invalid") || lowerBody.includes("failed")) {
+              console.warn(`⚠️  Response body suggests error: ${responseBody.substring(0, 300)}`);
+              wasSuccessful = false;
+            } else if (lowerBody.includes("success") || lowerBody.includes("entered") || lowerBody.includes("thank")) {
+              console.log(`✅ Response body suggests success`);
+              wasSuccessful = true;
+            }
           }
-        }
-      } catch (e) {
-        // Response body might not be readable, ignore
+        } catch (e) {
+          // Response body might not be readable, ignore
         }
       }
     } else {
@@ -883,13 +901,13 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
       console.warn(`⚠️  This may indicate the form did not submit properly`);
     }
     
-    // Wait for network to be idle to ensure all requests complete
-    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
+    // Wait for network to be idle to ensure all requests complete (shorter timeout)
+    await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
 
-    // Wait for any dynamic content to load
-    await page.waitForTimeout(2000);
+    // Wait for any dynamic content to load (shorter wait)
+    await page.waitForTimeout(1000);
 
-    // Check for success indicators
+    // Check for success indicators (shorter timeout since we already waited)
     const successIndicators = [
       page.getByText(/success|thank you|entered|submitted|you're entered|you are entered|entry received/i),
       page.locator('[class*="success"], [class*="alert-success"], [id*="success"]'),
@@ -899,7 +917,7 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
       successIndicators.map(async (indicator) => {
         try {
           const element = await indicator.first();
-          const isVisible = await element.isVisible({ timeout: 3000 });
+          const isVisible = await element.isVisible({ timeout: 2000 });
           if (isVisible) {
             const text = await element.textContent().catch(() => "");
             console.log(`✅ Success indicator found: ${text?.substring(0, 100)}`);
@@ -910,6 +928,11 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
         }
       })
     ).catch(() => false);
+    
+    // If we got a successful response, consider it a success even without visible indicator
+    if (wasSuccessful && hasSubmissionIndicator) {
+      console.log(`✅ Form submission successful (response received)`);
+    }
 
     // Check for error messages
     const errorIndicators = [
@@ -962,26 +985,99 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
       }
     }
 
-    // Determine if this submission was successful
-    let wasSuccessful = false;
-    if (hasSubmissionIndicator) {
-      // If we detected a submission (via network, navigation, or DOM), check for success
-      if (hasSuccessIndicator) {
-        wasSuccessful = true;
-      } else if (response && typeof response.request === 'function') {
-        // For network responses, check status code
-        wasSuccessful = response.status() >= 200 && response.status() < 300;
-      } else if (response && ('navigation' in response || 'domChange' in response)) {
-        // For navigation or DOM changes, assume success if no error indicator
-        wasSuccessful = !hasErrorIndicator;
+    // Determine if this submission was successful (update the variable we already declared)
+    // wasSuccessful may have already been set above based on response status
+    if (!wasSuccessful) {
+      if (hasSubmissionIndicator) {
+        // If we detected a submission (via network, navigation, or DOM), check for success
+        if (hasSuccessIndicator) {
+          wasSuccessful = true;
+        } else if (response && ('navigation' in response || 'domChange' in response)) {
+          // For navigation or DOM changes, assume success if no error indicator
+          wasSuccessful = !hasErrorIndicator;
+        }
+        // For network responses, wasSuccessful was already set above based on status code
+      } else {
+        // Fallback: if we have a success indicator even without submission detection, consider it successful
+        wasSuccessful = hasSuccessIndicator && !hasErrorIndicator;
       }
-    } else {
-      // Fallback: if we have a success indicator even without submission detection, consider it successful
-      wasSuccessful = hasSuccessIndicator && !hasErrorIndicator;
+    }
+    
+    // If we have a successful response but no visible success indicator, still consider it successful
+    if (wasSuccessful && hasSubmissionIndicator && !hasSuccessIndicator) {
+      console.log(`✅ Submission successful based on response, even without visible success message`);
+    }
+
+    // Check for confirmation page ("YOU'RE ALMOST DONE!") after submission
+    // This page appears after successful submission and requires clicking a button
+    const confirmationPageText = await page.textContent("body").catch(() => "");
+    const isConfirmationPage = confirmationPageText && (
+      confirmationPageText.includes("YOU'RE ALMOST DONE") ||
+      confirmationPageText.includes("You're almost done") ||
+      confirmationPageText.includes("ALMOST DONE") ||
+      confirmationPageText.includes("check your email") ||
+      confirmationPageText.includes("validation link")
+    );
+    
+    if (isConfirmationPage) {
+      console.log("📧 Confirmation page detected - clicking return button...");
+      try {
+        // Look for the "RETURN TO LOTTERY HOME" button or similar
+        // Try multiple strategies to find the button
+        let returnButton = null;
+        
+        // Strategy 1: Look for button with "RETURN TO LOTTERY HOME" text
+        try {
+          returnButton = page.getByRole("button", { name: /return to lottery|return to home|back to lottery/i }).first();
+          const visible = await returnButton.isVisible({ timeout: 1000 }).catch(() => false);
+          if (!visible) returnButton = null;
+        } catch {
+          returnButton = null;
+        }
+        
+        // Strategy 2: Look for button with "RETURN" text
+        if (!returnButton) {
+          try {
+            returnButton = page.locator('button:has-text("RETURN"), button:has-text("Return"), a:has-text("RETURN"), a:has-text("Return")').first();
+            const visible = await returnButton.isVisible({ timeout: 1000 }).catch(() => false);
+            if (!visible) returnButton = null;
+          } catch {
+            returnButton = null;
+          }
+        }
+        
+        // Strategy 3: Look for any button/link with "return" or "home" in text
+        if (!returnButton) {
+          try {
+            returnButton = page.locator('button, a').filter({ hasText: /return|home/i }).first();
+            const visible = await returnButton.isVisible({ timeout: 1000 }).catch(() => false);
+            if (!visible) returnButton = null;
+          } catch {
+            returnButton = null;
+          }
+        }
+        
+        if (returnButton) {
+          await returnButton.click({ timeout: 5000 });
+          console.log("✅ Clicked return button on confirmation page");
+          await page.waitForTimeout(1000);
+          // This confirms the submission was successful
+          wasSuccessful = true;
+        } else {
+          console.warn("⚠️  Could not find return button on confirmation page");
+          // Still consider it successful if we're on the confirmation page
+          wasSuccessful = true;
+        }
+      } catch (e) {
+        console.warn(`⚠️  Could not click return button on confirmation page: ${e.message}`);
+        // Still consider it successful if we're on the confirmation page
+        wasSuccessful = true;
+      }
     }
 
     if (wasSuccessful) {
       submissionSuccess = true;
+      console.log(`✅ Entry ${i + 1} submitted successfully!`);
     } else if (!submissionSuccess) {
       // Only set error if we haven't had a success yet
       if (hasErrorIndicator) {
@@ -990,15 +1086,24 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
           .textContent()
           .catch(() => "Unknown error");
         submissionError = errorText;
+        console.warn(`⚠️  Entry ${i + 1} submission failed: ${errorText}`);
       } else if (!response) {
         submissionError = "No form submission response detected";
+        console.warn(`⚠️  Entry ${i + 1}: No form submission response detected`);
       } else {
         submissionError = "Form submission may have failed";
+        console.warn(`⚠️  Entry ${i + 1}: Form submission may have failed`);
       }
     }
 
-    // Wait for a random timeout to avoid spamming the API
-    const breakTime = Math.floor(Math.random() * 1000) + 1;
+    // If we successfully submitted, we can optionally skip remaining entries
+    // (Some users might want to submit to all lotteries, so we continue by default)
+    // But we can reduce wait times if we've already had a success
+    
+    // Wait for a random timeout to avoid spamming the API (shorter if we've already succeeded)
+    const breakTime = submissionSuccess 
+      ? Math.floor(Math.random() * 500) + 200  // Shorter wait if already successful
+      : Math.floor(Math.random() * 1000) + 500; // Longer wait if still trying
     await page.waitForTimeout(breakTime);
       
       // Close modal if it's still open before next iteration (important for multiple entries)
@@ -1486,8 +1591,70 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
         console.warn(`⚠️  No form submission response detected within timeout`);
       }
       
-      await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
-      await page.waitForTimeout(2000);
+      await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(1000);
+
+      // Check for confirmation page ("YOU'RE ALMOST DONE!") after submission (same as modal approach)
+      const confirmationPageText = await page.textContent("body").catch(() => "");
+      const isConfirmationPage = confirmationPageText && (
+        confirmationPageText.includes("YOU'RE ALMOST DONE") ||
+        confirmationPageText.includes("You're almost done") ||
+        confirmationPageText.includes("ALMOST DONE") ||
+        confirmationPageText.includes("check your email") ||
+        confirmationPageText.includes("validation link")
+      );
+      
+      if (isConfirmationPage) {
+        console.log("📧 Confirmation page detected - clicking return button...");
+        try {
+          // Look for the "RETURN TO LOTTERY HOME" button or similar
+          let returnButton = null;
+          
+          // Strategy 1: Look for button with "RETURN TO LOTTERY HOME" text
+          try {
+            returnButton = page.getByRole("button", { name: /return to lottery|return to home|back to lottery/i }).first();
+            const visible = await returnButton.isVisible({ timeout: 1000 }).catch(() => false);
+            if (!visible) returnButton = null;
+          } catch {
+            returnButton = null;
+          }
+          
+          // Strategy 2: Look for button with "RETURN" text
+          if (!returnButton) {
+            try {
+              returnButton = page.locator('button:has-text("RETURN"), button:has-text("Return"), a:has-text("RETURN"), a:has-text("Return")').first();
+              const visible = await returnButton.isVisible({ timeout: 1000 }).catch(() => false);
+              if (!visible) returnButton = null;
+            } catch {
+              returnButton = null;
+            }
+          }
+          
+          // Strategy 3: Look for any button/link with "return" or "home" in text
+          if (!returnButton) {
+            try {
+              returnButton = page.locator('button, a').filter({ hasText: /return|home/i }).first();
+              const visible = await returnButton.isVisible({ timeout: 1000 }).catch(() => false);
+              if (!visible) returnButton = null;
+            } catch {
+              returnButton = null;
+            }
+          }
+          
+          if (returnButton) {
+            await returnButton.click({ timeout: 5000 });
+            console.log("✅ Clicked return button on confirmation page");
+            await page.waitForTimeout(1000);
+            hasSubmissionIndicator = true; // This confirms the submission was successful
+          } else {
+            console.warn("⚠️  Could not find return button on confirmation page");
+            hasSubmissionIndicator = true; // Still consider it successful if we're on the confirmation page
+          }
+        } catch (e) {
+          console.warn(`⚠️  Could not click return button on confirmation page: ${e.message}`);
+          hasSubmissionIndicator = true; // Still consider it successful if we're on the confirmation page
+        }
+      }
 
       // Check for success indicators (same as modal approach)
       const successIndicators = [

@@ -83,6 +83,27 @@ You can test the automation locally before deploying to GitHub Actions:
    npm run test:debug
    ```
 
+   **Filter to specific shows:**
+
+   You can test only specific shows by setting the `SHOWS` environment variable with a comma-separated list of show names:
+
+   ```bash
+   # Test only Aladdin and Wicked
+   SHOWS=aladdin,wicked make test
+
+   # Test only Six
+   SHOWS=six-ny make test-headless
+
+   # Using npm directly
+   SHOWS=aladdin,wicked npm run test:headed
+   ```
+
+   The filter matches show names from the URL (e.g., `aladdin` matches `aladdin`, `six-ny` matches `six-ny`). You can also add it to your `.envrc` file:
+
+   ```bash
+   export SHOWS="aladdin,wicked"
+   ```
+
 4. **View test report:**
    ```bash
    make test-report

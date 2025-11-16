@@ -37,25 +37,41 @@ setup: install ## Set up the project (install deps and browsers)
 
 test: test-headed ## Run tests with browser visible (default)
 
-test-headed: ## Run tests with browser visible (headed mode)
-	@echo "🎭 Running Playwright tests in headed mode (browser will be visible)..."
+test-headed: ## Run tests with browser visible (headed mode). Use SHOWS=aladdin,wicked to filter shows
+	@if [ -n "$(SHOWS)" ]; then \
+		echo "🎭 Running Playwright tests in headed mode (filtered to: $(SHOWS))..."; \
+	else \
+		echo "🎭 Running Playwright tests in headed mode (browser will be visible)..."; \
+	fi
 	@echo ""
-	npx playwright test
+	SHOWS=$(SHOWS) npx playwright test
 
-test-headless: ## Run tests in headless mode
-	@echo "🎭 Running Playwright tests in headless mode..."
+test-headless: ## Run tests in headless mode. Use SHOWS=aladdin,wicked to filter shows
+	@if [ -n "$(SHOWS)" ]; then \
+		echo "🎭 Running Playwright tests in headless mode (filtered to: $(SHOWS))..."; \
+	else \
+		echo "🎭 Running Playwright tests in headless mode..."; \
+	fi
 	@echo ""
-	CI=true npx playwright test
+	CI=true SHOWS=$(SHOWS) npx playwright test
 
-test-ui: ## Run tests with Playwright UI mode (interactive)
-	@echo "🎭 Running Playwright tests in UI mode..."
+test-ui: ## Run tests with Playwright UI mode (interactive). Use SHOWS=aladdin,wicked to filter shows
+	@if [ -n "$(SHOWS)" ]; then \
+		echo "🎭 Running Playwright tests in UI mode (filtered to: $(SHOWS))..."; \
+	else \
+		echo "🎭 Running Playwright tests in UI mode..."; \
+	fi
 	@echo ""
-	npx playwright test --ui
+	SHOWS=$(SHOWS) npx playwright test --ui
 
-test-debug: ## Run tests in debug mode (step through)
-	@echo "🎭 Running Playwright tests in debug mode..."
+test-debug: ## Run tests in debug mode (step through). Use SHOWS=aladdin,wicked to filter shows
+	@if [ -n "$(SHOWS)" ]; then \
+		echo "🎭 Running Playwright tests in debug mode (filtered to: $(SHOWS))..."; \
+	else \
+		echo "🎭 Running Playwright tests in debug mode..."; \
+	fi
 	@echo ""
-	npx playwright test --debug
+	SHOWS=$(SHOWS) npx playwright test --debug
 
 test-report: ## Open the last test report
 	@echo "📊 Opening test report..."

@@ -13,3 +13,7 @@ export DOB_DAY="15"
 export DOB_YEAR="1990"
 export ZIP="10001"
 export COUNTRY="USA"
+
+# Optional: Filter to specific shows (comma-separated)
+# Examples: "aladdin,wicked" or "six-ny" or leave unset to test all shows
+# export SHOWS="aladdin,wicked"

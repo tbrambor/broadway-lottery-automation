@@ -11,7 +11,7 @@ const stealth = stealthPlugin();
 // Add the plugin to Playwright (any number of plugins can be added)
 chromium.use(stealth);
 
-const urls = [
+const allUrls = [
   "https://lottery.broadwaydirect.com/show/aladdin/",
   "https://lottery.broadwaydirect.com/show/beetlejuice-ny/",
   "https://lottery.broadwaydirect.com/show/death-becomes-her-ny/",
@@ -21,6 +21,46 @@ const urls = [
   "https://lottery.broadwaydirect.com/show/the-lion-king/",
   "https://lottery.broadwaydirect.com/show/wicked/",
 ];
+
+// Filter URLs based on SHOWS environment variable
+// Supports comma-separated list of show names (e.g., "aladdin,wicked") or full URLs
+function filterUrls(urls: string[]): string[] {
+  const showsFilter = process.env.SHOWS;
+  if (!showsFilter) {
+    return urls; // No filter, return all
+  }
+
+  const filterTerms = showsFilter.split(',').map(term => term.trim().toLowerCase());
+  
+  return urls.filter(url => {
+    // Extract show name from URL (e.g., "aladdin" from "https://lottery.broadwaydirect.com/show/aladdin/")
+    const showName = url.split("/show/")[1]?.replace(/\//g, "").toLowerCase() || "";
+    const urlLower = url.toLowerCase();
+    
+    // Check if any filter term matches the show name or URL
+    return filterTerms.some(term => {
+      // Match by show name (e.g., "aladdin" matches "aladdin")
+      if (showName.includes(term) || term.includes(showName)) {
+        return true;
+      }
+      // Match by full URL
+      if (urlLower.includes(term)) {
+        return true;
+      }
+      return false;
+    });
+  });
+}
+
+const urls = filterUrls(allUrls);
+
+if (urls.length === 0) {
+  console.warn("⚠️  No shows matched the SHOWS filter. Available shows:");
+  allUrls.forEach(url => {
+    const showName = url.split("/show/")[1]?.replace(/\//g, "") || url;
+    console.warn(`   - ${showName}`);
+  });
+}
 
 urls.forEach((url) => {
   test(`Sign up at ${url}`, async ({}, testInfo) => {
