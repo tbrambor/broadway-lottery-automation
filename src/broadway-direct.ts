@@ -504,17 +504,41 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
     await page.locator("#dlslot_agree").check({ force: true });
 
     // Set up error logging before form submission
-    // Log JavaScript console errors
+    // Log JavaScript console errors (filter out known harmless errors)
     page.on("console", (msg) => {
       const type = msg.type();
       if (type === "error") {
-        console.log(`🔴 Console error: ${msg.text()}`);
+        const text = msg.text();
+        // Filter out common, harmless errors from third-party scripts
+        const harmlessErrors = [
+          "Cannot read properties of null",
+          "Cannot read property",
+          "null is not an object",
+          "is not defined",
+          "Script error",
+        ];
+        const isHarmless = harmlessErrors.some((pattern) => text.includes(pattern));
+        if (!isHarmless) {
+          console.log(`🔴 Console error: ${text}`);
+        }
       }
     });
 
-    // Log page errors
+    // Log page errors (filter out known harmless errors)
     page.on("pageerror", (error) => {
-      console.log(`🔴 Page error: ${error.message}`);
+      const errorMessage = error.message;
+      // Filter out common, harmless errors from third-party scripts
+      const harmlessErrors = [
+        "Cannot read properties of null",
+        "Cannot read property",
+        "null is not an object",
+        "is not defined",
+        "Script error",
+      ];
+      const isHarmless = harmlessErrors.some((pattern) => errorMessage.includes(pattern));
+      if (!isHarmless) {
+        console.log(`🔴 Page error: ${errorMessage}`);
+      }
     });
 
       // Handle cookie consent banner if present - do this more aggressively
@@ -762,16 +786,6 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
             console.log(
               `📡 Form submission response: ${method} ${status} ${url}`
             );
-            
-            // Try to get response body for debugging
-            try {
-              const body = await response.text();
-              if (body) {
-                console.log(`📄 Response body preview: ${body.substring(0, 200)}`);
-              }
-            } catch (e) {
-              // Response body might not be available, ignore
-            }
           }
 
           return isFormSubmission;
@@ -1325,15 +1339,41 @@ export async function broadwayDirect({ browser, userInfo, url }): Promise<Lotter
       await page.locator("#dlslot_agree").check({ force: true });
 
       // Set up error logging before form submission
+      // Log JavaScript console errors (filter out known harmless errors)
       page.on("console", (msg) => {
         const type = msg.type();
         if (type === "error") {
-          console.log(`🔴 Console error: ${msg.text()}`);
+          const text = msg.text();
+          // Filter out common, harmless errors from third-party scripts
+          const harmlessErrors = [
+            "Cannot read properties of null",
+            "Cannot read property",
+            "null is not an object",
+            "is not defined",
+            "Script error",
+          ];
+          const isHarmless = harmlessErrors.some((pattern) => text.includes(pattern));
+          if (!isHarmless) {
+            console.log(`🔴 Console error: ${text}`);
+          }
         }
       });
 
+      // Log page errors (filter out known harmless errors)
       page.on("pageerror", (error) => {
-        console.log(`🔴 Page error: ${error.message}`);
+        const errorMessage = error.message;
+        // Filter out common, harmless errors from third-party scripts
+        const harmlessErrors = [
+          "Cannot read properties of null",
+          "Cannot read property",
+          "null is not an object",
+          "is not defined",
+          "Script error",
+        ];
+        const isHarmless = harmlessErrors.some((pattern) => errorMessage.includes(pattern));
+        if (!isHarmless) {
+          console.log(`🔴 Page error: ${errorMessage}`);
+        }
       });
 
       // Handle cookie consent banner if present

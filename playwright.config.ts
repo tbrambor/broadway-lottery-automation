@@ -12,7 +12,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   /* Maximum time one test can run for. */
-  timeout: 120000, // 2 minutes
+  timeout: 600000, // 10 minutes (lottery entries can take time with reCAPTCHA, form submission, etc.)
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

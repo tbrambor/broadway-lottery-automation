@@ -144,6 +144,15 @@ if (urls.length === 0) {
     const status = show.enabled === false ? " (disabled)" : "";
     console.warn(`   - ${show.name}${status}`);
   });
+
+  // Add a test that passes when there are no shows to test
+  // This prevents the test suite from failing with "no tests found"
+  test("No shows to test", () => {
+    console.log(
+      "ℹ️  No shows configured or filtered - skipping lottery entries"
+    );
+    // Test passes - no shows is a valid state
+  });
 }
 
 urls.forEach((url) => {
@@ -166,18 +175,23 @@ urls.forEach((url) => {
         console.log(
           `✅ Successfully completed lottery signup for: ${showName}`
         );
+        // Test passes - entry was successful
       } else if (result.reason === "closed") {
         console.log(
           `ℹ️  Lottery is closed for: ${showName} - ${result.message}`
         );
+        // Test passes - closed lotteries are expected and not a failure
       } else if (result.reason === "no_entries") {
         console.log(
           `ℹ️  No entry links found for: ${showName} - ${result.message}`
         );
+        // Test passes - no entries available is expected and not a failure
       } else {
         console.log(
           `❌ Failed to submit lottery entry for: ${showName} - ${result.message}`
         );
+        // Test fails - actual submission failure
+        throw new Error(`Failed to submit lottery entry: ${result.message}`);
       }
 
       // Keep browser open for a bit to see the result (unless in CI or KEEP_BROWSER_OPEN is not set)
@@ -189,6 +203,11 @@ urls.forEach((url) => {
         // Keep browser open indefinitely
         await new Promise(() => {});
       }
+    } catch (error) {
+      // Log the error for debugging
+      console.error(`❌ Test error for ${showName}:`, error);
+      // Re-throw to fail the test
+      throw error;
     } finally {
       if (browser) {
         await browser.close();
