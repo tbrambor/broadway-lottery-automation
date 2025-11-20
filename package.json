@@ -18,15 +18,22 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NameFILIP/broadway-lottery.git"
+    "url": "git+https://github.com/tbrambor/broadway-lottery.git"
   },
-  "keywords": [],
+  "keywords": [
+    "broadway",
+    "lottery",
+    "automation",
+    "playwright",
+    "telecharge",
+    "broadway-direct"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/NameFILIP/broadway-lottery/issues"
+    "url": "https://github.com/tbrambor/broadway-lottery/issues"
   },
-  "homepage": "https://github.com/NameFILIP/broadway-lottery#readme",
+  "homepage": "https://github.com/tbrambor/broadway-lottery#readme",
   "devDependencies": {
     "@babel/preset-env": "^7.23.2",
     "@babel/preset-typescript": "^7.23.2",

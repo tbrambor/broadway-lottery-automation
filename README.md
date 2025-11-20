@@ -1,13 +1,28 @@
-# Broadway Lottery
+# Broadway Lottery Automation
 
 ## Overview
 
-The project was created to automate signing up for Broadway musicals' lotteries to get affordable tickets. It supports multiple lottery platforms:
+This project automates signing up for Broadway musical lotteries to get affordable tickets. It supports multiple lottery platforms:
 
 - **[Broadway Direct](https://lottery.broadwaydirect.com/)** - TypeScript/Playwright implementation
 - **[Telecharge](https://www.telecharge.com/)** - TypeScript/Playwright implementation
 
 Each lottery platform has its own workflow and can be enabled independently. The results of the lottery drawings are sent out via email (frequently at 3 p.m., but not always). Enjoy the shows and please use this automation responsibly. Reselling these tickets is not allowed.
+
+## Acknowledgments
+
+This project was originally forked from [NameFILIP/broadway-lottery](https://github.com/NameFILIP/broadway-lottery) but has since evolved significantly with major enhancements including:
+
+- **Multi-lottery support**: Added Telecharge lottery automation alongside Broadway Direct
+- **Auto-discovery**: Automatic show discovery from bwayrush.com for both platforms
+- **Interactive configuration**: User-friendly tools for configuring which shows to enter
+- **Enhanced modularity**: Improved code structure and maintainability
+- **Better documentation**: Comprehensive guides for non-technical users
+- **GitHub Actions integration**: Automated daily lottery entries
+
+While the original project provided the foundation, this version has been substantially rewritten and expanded to support a more comprehensive lottery automation workflow.
+
+For more details, see [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md).
 
 ## Quick Configuration Guide
 
@@ -141,7 +156,7 @@ You can test the automation locally before deploying to GitHub Actions:
 
 ### GitHub Actions (Automated)
 
-1. "Fork" the repository (button at the top right side)
+1. Clone or fork this repository
 2. To create ([repository secrets](https://docs.github.com/en/actions/security-guides/using-secrets-in-github-actions#creating-secrets-for-a-repository)) go to the **Settings** tab => **Secrets and variables** => **Actions**
 3. Click "New repository secret" and add the following secrets with your personal information:
 
@@ -167,21 +182,26 @@ You can test the automation locally before deploying to GitHub Actions:
 4. Go to the **Actions** tab, accept the terms and conditions, and enable the workflow(s) you want to use:
    - **BroadwayDirect Lottery** - for Broadway Direct lotteries
    - **Telecharge Lottery** - for Telecharge lotteries
-5. The workflows will run daily at the [specified time](/.github/workflows/broadway-direct-lottery.yml#L5) (UTC timezone) for Broadway Direct and [12:01 AM Eastern Time](/.github/workflows/telecharge-lottery.yml#L10) for Telecharge
+5. The workflows will run daily at the specified times:
+   - **Broadway Direct**: 09:01 EST (14:01 UTC) - see `.github/workflows/broadway-direct-lottery.yml`
+   - **Telecharge**: 12:01 AM Eastern Time (04:01 UTC) - see `.github/workflows/telecharge-lottery.yml`
 6. Update show lists as needed:
-   - **Broadway Direct**: Run `make discover-broadway-direct` or edit [broadway-direct/showsToEnter.json](/broadway-direct/showsToEnter.json)
-   - **Telecharge**: Run `make discover-telecharge` or edit [telecharge/showsToEnter.json](/telecharge/showsToEnter.json)
+   - **Broadway Direct**: Run `make discover-broadway-direct` or edit `broadway-direct/showsToEnter.json`
+   - **Telecharge**: Run `make discover-telecharge` or edit `telecharge/showsToEnter.json`
    - **Both**: Run `make discover-all` to update both at once
 
 ### Secrets example
 
 #### List of secrets
 
-<img width="640" alt="image" src="https://github.com/NameFILIP/broadway-lottery/assets/834796/7b3baad6-5fad-42ff-9704-074d6bcaadc2">
+To view your secrets, go to **Settings** → **Secrets and variables** → **Actions** in your GitHub repository.
 
 #### Create a new secret
 
-<img width="640" alt="image" src="https://github.com/NameFILIP/broadway-lottery/assets/834796/52daa38a-7fec-4f5d-b918-362b18dcb2bc">
+1. Click "New repository secret"
+2. Enter the secret name (e.g., `FIRST_NAME`)
+3. Enter the secret value
+4. Click "Add secret"
 
 ## Email filters
 
