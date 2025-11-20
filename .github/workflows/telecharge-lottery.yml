@@ -1,9 +1,13 @@
 name: Telecharge Lottery
 on:
   schedule:
-    # Run every day at 12:01 AM EST (midnight + 1 minute)
-    # UTC timezone is 05:01 (EST is UTC-5)
-    - cron: "01 05 * * *"
+    # Run every day at 12:01 AM Eastern Time (midnight + 1 minute)
+    # Note: GitHub Actions cron is in UTC and doesn't adjust for DST
+    # EDT (Mar-Nov): 12:01 AM EDT = 04:01 UTC
+    # EST (Nov-Mar): 12:01 AM EST = 05:01 UTC
+    # We use 04:01 UTC to catch EDT, which will run at 11:01 PM EST in winter
+    # (still acceptable as lottery opens at midnight)
+    - cron: "01 04 * * *"
   workflow_dispatch: # allow manual runs for debugging
 
 jobs:

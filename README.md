@@ -5,9 +5,13 @@
 The project was created to automate signing up for Broadway musicals' lotteries to get affordable tickets. It supports multiple lottery platforms:
 
 - **[Broadway Direct](https://lottery.broadwaydirect.com/)** - TypeScript/Playwright implementation
-- **[Telecharge](https://www.telecharge.com/)** - Python/Selenium implementation
+- **[Telecharge](https://www.telecharge.com/)** - TypeScript/Playwright implementation
 
 Each lottery platform has its own workflow and can be enabled independently. The results of the lottery drawings are sent out via email (frequently at 3 p.m., but not always). Enjoy the shows and please use this automation responsibly. Reselling these tickets is not allowed.
+
+## Quick Configuration Guide
+
+**New to this project?** See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for step-by-step instructions on how to configure which shows to enter directly on GitHub - no coding knowledge required!
 
 ## How to use it
 
@@ -109,6 +113,25 @@ You can test the automation locally before deploying to GitHub Actions:
    export SHOWS="aladdin,wicked"
    ```
 
+   **Or configure shows via JSON file (recommended):**
+
+   **Option A: Auto-discover shows from bwayrush.com:**
+
+   ```bash
+   make discover-broadway-direct
+   ```
+
+   This will automatically discover all Broadway Direct lottery shows from [bwayrush.com](https://bwayrush.com/) and update `broadway-direct/showsToEnter.json`. **Your existing preferences are preserved** - if you've set `enabled: false` for a show, it will remain disabled.
+
+   **Option B: Edit the file directly:**
+
+   Edit `broadway-direct/showsToEnter.json` to control which shows to enter:
+
+   - Set `enabled: false` to skip a show
+   - Set `enabled: true` (or omit) to enter a show
+
+   See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for detailed instructions.
+
 4. **View test report:**
    ```bash
    make test-report
@@ -134,15 +157,21 @@ You can test the automation locally before deploying to GitHub Actions:
    8. `ZIP` - address postal code (example value: `10007`)
    9. `COUNTRY` (allowed values: `USA`, `CANADA`, `OTHER`)
 
-   **Additional secrets required for Telecharge lottery:** 10. `TELECHARGE_EMAIL` - Your Telecharge account email (example: `donald.duck@gmail.com`) 11. `TELECHARGE_PASSWORD` - Your Telecharge account password
+   **Additional secrets required for Telecharge lottery:**
+
+   10. `TELECHARGE_EMAIL` - Your Telecharge account email (example: `donald.duck@gmail.com`)
+   11. `TELECHARGE_PASSWORD` - Your Telecharge account password
+
+   ⚠️ **Important:** Make sure all secrets are set, especially `TELECHARGE_EMAIL` and `TELECHARGE_PASSWORD` if you're using the Telecharge lottery. The workflow will fail with "Missing required environment variable" errors if any secrets are missing.
 
 4. Go to the **Actions** tab, accept the terms and conditions, and enable the workflow(s) you want to use:
    - **BroadwayDirect Lottery** - for Broadway Direct lotteries
    - **Telecharge Lottery** - for Telecharge lotteries
-5. The workflows will run daily at the [specified time](/.github/workflows/broadway-direct-lottery.yml#L5) (UTC timezone) for Broadway Direct and [Telecharge](/.github/workflows/telecharge-lottery.yml#L5) (same schedule)
-6. Modify the show lists as needed:
-   - Broadway Direct: Edit the [list of shows](/e2e/broadway-direct.spec.ts#L14)
-   - Telecharge: Edit the [showsToEnter.json](/telecharge/showsToEnter.json) file
+5. The workflows will run daily at the [specified time](/.github/workflows/broadway-direct-lottery.yml#L5) (UTC timezone) for Broadway Direct and [12:01 AM Eastern Time](/.github/workflows/telecharge-lottery.yml#L10) for Telecharge
+6. Update show lists as needed:
+   - **Broadway Direct**: Run `make discover-broadway-direct` or edit [broadway-direct/showsToEnter.json](/broadway-direct/showsToEnter.json)
+   - **Telecharge**: Run `make discover-telecharge` or edit [telecharge/showsToEnter.json](/telecharge/showsToEnter.json)
+   - **Both**: Run `make discover-all` to update both at once
 
 ### Secrets example
 
@@ -177,28 +206,45 @@ The Telecharge lottery uses TypeScript and Playwright (same as Broadway Direct).
    ```
 
 2. **Configure shows:**
-   
-   **Option A: Auto-discover shows from bwayrush.com (recommended):**
-   
+
+   **Option A: Interactive configuration tool (easiest for non-technical users):**
+
+   ```bash
+   make configure-shows
+   ```
+
+   This will ask you which lottery to configure (Telecharge, Broadway Direct, or both) and guide you through each show:
+
+   - **Telecharge**: Set number of tickets (0 = skip, 1 or 2 = enter)
+   - **Broadway Direct**: Answer y/yes to enter, n/no to skip
+
+   **Option B: Auto-discover shows from bwayrush.com:**
+
    ```bash
    make discover-telecharge
    ```
-   
-   This will automatically discover all Telecharge lottery shows from [bwayrush.com](https://bwayrush.com/) and update `telecharge/showsToEnter.json`. You can then edit the file to remove shows you don't want or adjust settings.
-   
-   **Option B: Manually edit the shows file:**
-   
-   Edit `telecharge/showsToEnter.json` to add the shows you want to enter:
 
-   ```json
-   [
-     {
-       "name": "Show Name",
-       "url": "https://www.telecharge.com/show-url",
-       "num_tickets": 2
-     }
-   ]
-   ```
+   This will automatically discover all Telecharge lottery shows from [bwayrush.com](https://bwayrush.com/) and update `telecharge/showsToEnter.json`. **Your existing preferences are preserved** - if you've set `num_tickets: 0` for a show, it will remain disabled.
+
+   **Option C: Edit the file directly on GitHub:**
+
+   1. Go to `telecharge/showsToEnter.json` in your GitHub repository
+   2. Click the ✏️ (pencil) icon to edit
+   3. Change `num_tickets` values:
+      - `0` = Skip this show (don't enter)
+      - `1` = Enter for 1 ticket
+      - `2` = Enter for 2 tickets
+   4. Click "Commit changes"
+
+   See [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for detailed instructions and examples.
+
+   **Selecting which shows to enter:**
+
+   - Set `num_tickets` to `1` or `2` to enter that show's lottery
+   - Set `num_tickets` to `0` to **skip** that show (it won't be entered)
+   - If `num_tickets` is not specified, it defaults to the value from `NUMBER_OF_TICKETS` environment variable
+
+   **Note:** After logging in, the script will automatically navigate to the lottery selection page where all available lotteries are displayed. It will then enter each enabled lottery by matching the show name. You don't need to provide individual show URLs.
 
 3. **Set environment variables:**
 
@@ -236,4 +282,4 @@ The Telecharge lottery uses TypeScript and Playwright (same as Broadway Direct).
    SHOWS=show1,show2 make telecharge
    ```
 
-The GitHub Actions workflow will automatically run the Telecharge lottery daily at 12:01 AM EST if enabled.
+The GitHub Actions workflow will automatically run the Telecharge lottery daily at 12:01 AM Eastern Time (04:01 UTC) if enabled. Note: Due to daylight saving time, in winter (EST) it will run at 11:01 PM EST the day before, which is still acceptable as the lottery opens at midnight.

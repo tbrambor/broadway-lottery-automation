@@ -33,13 +33,13 @@ async function loginToTelecharge(
     const iframeElement = await page.locator(iframeSelector).elementHandle();
     if (!iframeElement) {
       console.log("⚠️  Could not find iframe");
-      return false;
+      return { success: false, iframe: null };
     }
 
     const iframe = await iframeElement.contentFrame();
     if (!iframe) {
       console.log("⚠️  Could not access iframe content");
-      return false;
+      return { success: false, iframe: null };
     }
 
     console.log("✅ Iframe frame accessed, waiting for content to load...");
@@ -452,18 +452,193 @@ async function submitForm(page: Page): Promise<boolean> {
 }
 
 /**
- * Main function to enter Telecharge lottery for a show
+ * Navigate to the lottery selection page after login
+ */
+async function navigateToLotteryPage(iframe: Page): Promise<boolean> {
+  try {
+    console.log("🔍 Navigating to lottery selection page...");
+    
+    // Check if we're already on the lottery page
+    const currentUrl = iframe.url();
+    if (currentUrl.includes("lottery_select")) {
+      console.log("✅ Already on lottery selection page");
+      return true;
+    }
+
+    // Try to navigate to lottery page
+    await iframe.goto("https://my.socialtoaster.com/st/lottery_select/?key=BROADWAY&source=iframe", {
+      waitUntil: "networkidle",
+      timeout: 30000,
+    });
+    
+    await iframe.waitForTimeout(2000);
+    console.log("✅ Navigated to lottery selection page");
+    return true;
+  } catch (error) {
+    console.log(`⚠️  Error navigating to lottery page: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Enter a specific lottery by show name
+ */
+async function enterLotteryForShow(
+  iframe: Page,
+  showName: string,
+  numTickets: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    console.log(`🎭 Looking for lottery entry for: ${showName}`);
+
+    // Find the lottery show by name
+    // The show title is in .lottery_show_title with class st_uppercase
+    const showTitles = await iframe.locator(".lottery_show_title").all();
+    
+    let eventId: string | null = null;
+    let showElement: any = null;
+
+    for (const titleElement of showTitles) {
+      const titleText = (await titleElement.textContent()) || "";
+      const normalizedTitle = titleText.trim().toUpperCase();
+      const normalizedShowName = showName.toUpperCase();
+
+      // Check if the title matches (exact match or contains)
+      if (
+        normalizedTitle === normalizedShowName ||
+        normalizedTitle.includes(normalizedShowName) ||
+        normalizedShowName.includes(normalizedTitle)
+      ) {
+        // Find the parent .lottery_show div
+        showElement = titleElement.locator("xpath=ancestor::div[contains(@class, 'lottery_show')][1]").first();
+        
+        // Extract event ID from the Enter button's onclick attribute
+        // The button has onclick="enter_event(39453)" where 39453 is the event_id
+        const enterButton = showElement.locator('a[onclick*="enter_event"]').first();
+        const onclickAttr = await enterButton.getAttribute("onclick").catch(() => "");
+        
+        if (onclickAttr) {
+          const match = onclickAttr.match(/enter_event\((\d+)\)/);
+          if (match && match[1]) {
+            eventId = match[1];
+            console.log(`✅ Found show "${showName}" with event ID: ${eventId}`);
+            break;
+          }
+        }
+      }
+    }
+
+    if (!eventId || !showElement) {
+      return {
+        success: false,
+        message: `Could not find lottery entry for show: ${showName}`,
+      };
+    }
+
+    // Check if already entered (look for .{eventId}-entered div that's visible)
+    const enteredDiv = showElement.locator(`.${eventId}-entered`).first();
+    const isEntered = await enteredDiv.isVisible({ timeout: 1000 }).catch(() => false);
+    
+    if (isEntered) {
+      console.log(`ℹ️  Already entered lottery for: ${showName}`);
+      return {
+        success: true,
+        message: `Already entered lottery for: ${showName}`,
+      };
+    }
+
+    // Set number of tickets if there's a selector
+    const ticketSelector = showElement.locator(`#tickets_${eventId}`).first();
+    const ticketSelectorVisible = await ticketSelector.isVisible({ timeout: 2000 }).catch(() => false);
+    
+    if (ticketSelectorVisible) {
+      await ticketSelector.selectOption(numTickets);
+      console.log(`✅ Set tickets to ${numTickets} for ${showName}`);
+    }
+
+    // Click the Enter button or call enter_event directly
+    const enterButton = showElement.locator('a[onclick*="enter_event"]').first();
+    const enterButtonVisible = await enterButton.isVisible({ timeout: 2000 }).catch(() => false);
+    
+    if (enterButtonVisible) {
+      await enterButton.click();
+      console.log(`✅ Clicked Enter button for ${showName}`);
+    } else {
+      // Try calling the JavaScript function directly
+      await iframe.evaluate(
+        ({ eventId, numTickets }) => {
+          // Set tickets first if selector exists
+          const ticketSelect = document.getElementById(`tickets_${eventId}`) as HTMLSelectElement;
+          if (ticketSelect) {
+            ticketSelect.value = numTickets;
+          }
+          // Call enter_event function
+          if (typeof (window as any).enter_event === "function") {
+            (window as any).enter_event(eventId);
+          }
+        },
+        { eventId, numTickets }
+      );
+      console.log(`✅ Called enter_event(${eventId}) for ${showName}`);
+    }
+
+    // Wait for AJAX response
+    await iframe.waitForTimeout(2000);
+
+    // Check if entry was successful (look for success message or entered state)
+    const enteredAfter = await enteredDiv.isVisible({ timeout: 3000 }).catch(() => false);
+    const pageText = (await iframe.textContent("body").catch(() => "")) || "";
+    const lowerText = pageText.toLowerCase();
+
+    const hasSuccess =
+      enteredAfter ||
+      lowerText.includes("lottery entered") ||
+      lowerText.includes("entry received") ||
+      lowerText.includes("successfully entered");
+
+    if (hasSuccess) {
+      console.log(`✅ Successfully entered lottery for: ${showName}`);
+      return {
+        success: true,
+        message: `Successfully entered lottery for: ${showName}`,
+      };
+    }
+
+    // Check for error messages
+    if (lowerText.includes("error") || lowerText.includes("sorry")) {
+      return {
+        success: false,
+        message: `Error entering lottery for: ${showName}`,
+      };
+    }
+
+    // If we can't determine, assume success
+    return {
+      success: true,
+      message: `Lottery entry attempted for: ${showName} (confirmation unclear)`,
+    };
+  } catch (error) {
+    console.log(`❌ Error entering lottery for ${showName}: ${error}`);
+    return {
+      success: false,
+      message: `Error: ${error}`,
+    };
+  }
+}
+
+/**
+ * Main function to enter Telecharge lottery for shows
  */
 export async function telecharge({
   browser,
   userInfo,
   login,
-  url,
+  shows,
 }: {
   browser: Browser;
   userInfo: UserInfo;
   login: TelechargeLogin;
-  url: string;
+  shows: Array<{ name: string; num_tickets?: number }>;
 }): Promise<LotteryResult> {
   const page = await browser.newPage();
 
@@ -491,168 +666,107 @@ export async function telecharge({
     await iframe.waitForLoadState("networkidle", { timeout: 30000 });
     await page.waitForTimeout(2000);
 
-    // Look for "Enter the lottery" image/button in the iframe
-    // The image is wrapped in a link: <a href="/st/lottery_select/?key=BROADWAY&source=iframe">
-    // Image has class: st_block_slider_no_header
-    console.log("🔍 Looking for 'Enter the lottery' button/image...");
-    const enterLotterySelectors = [
-      'a[href*="lottery_select"]',
-      'a[href*="/st/lottery_select/"]',
-      'a:has(img.st_block_slider_no_header)',
-      'a:has(img[src*="20241029183713_BROADWAY_Mg4oAH2dfxW7SXP0.jpg"])',
-      'a:has(img[src*="BROADWAY_Mg4oAH2dfxW7SXP0"])',
-      'img.st_block_slider_no_header',
-      'img[src*="20241029183713_BROADWAY_Mg4oAH2dfxW7SXP0.jpg"]',
-      'img[src*="BROADWAY_Mg4oAH2dfxW7SXP0"]',
-      'img[alt*="Enter the lottery"]',
-      'img[alt*="Enter Lottery"]',
-      'img[alt*="enter the lottery"]',
-      'a:has(img[alt*="Enter the lottery"])',
-      'a:has(img[alt*="Enter Lottery"])',
-      'a:has-text("Enter the lottery")',
-      'a:has-text("Enter Lottery")',
-      'button:has-text("Enter the lottery")',
-      'button:has-text("Enter Lottery")',
-      '[alt*="Enter the lottery"]',
-      '[alt*="Enter Lottery"]',
-    ];
-
-    let enterLotteryClicked = false;
-    for (const selector of enterLotterySelectors) {
-      try {
-        const element = iframe.locator(selector).first();
-        const isVisible = await element.isVisible({ timeout: 5000 }).catch(() => false);
-        if (isVisible) {
-          // If it's an image, try to find its parent link first
-          const tagName = await element.evaluate((el) => el.tagName.toLowerCase()).catch(() => "");
-          if (tagName === "img") {
-            // Try to find parent link (the <a> tag wrapping the image)
-            try {
-              const parentLink = element.locator("xpath=ancestor::a[1]").first();
-              const linkVisible = await parentLink.isVisible({ timeout: 1000 }).catch(() => false);
-              if (linkVisible) {
-                await parentLink.click();
-                console.log("✅ Clicked 'Enter the lottery' link (parent of image)");
-                enterLotteryClicked = true;
-                await iframe.waitForTimeout(2000);
-                break;
-              }
-            } catch {
-              // If parent link not found, click the image itself
-            }
-            await element.click();
-            console.log("✅ Clicked 'Enter the lottery' image");
-          } else {
-            await element.click();
-            console.log("✅ Clicked 'Enter the lottery' button/link");
-          }
-          enterLotteryClicked = true;
-          await iframe.waitForTimeout(2000);
-          break;
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    if (!enterLotteryClicked) {
-      console.log("⚠️  Could not find 'Enter the lottery' button/image, trying to navigate to show URL...");
-      // If we can't find the button, try navigating to the show URL
-      // But the show URL might be on a different domain, so we might need to navigate the main page
-      await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
-      await handleCookieConsent(page);
-    }
-
-    // Check if lottery is open (check iframe if we're still in it, otherwise check main page)
-    const checkPage = enterLotteryClicked ? iframe : page;
-    const { isOpen, lotteryUrl } = await checkLotteryStatus(checkPage);
-
-    if (!isOpen) {
-      console.log("ℹ️  Lottery is closed or not available");
+    // Navigate to lottery selection page
+    const navigated = await navigateToLotteryPage(iframe);
+    if (!navigated) {
       return {
         success: false,
-        message: "Lottery is closed or not available",
+        message: "Could not navigate to lottery selection page",
+        reason: "failed",
+      };
+    }
+
+    // Wait for lottery shows to load
+    await iframe.waitForSelector(".lottery_show", { timeout: 30000 });
+    await iframe.waitForTimeout(2000);
+
+    // Check if lotteries are available
+    const pageText = (await iframe.textContent("body").catch(() => "")) || "";
+    const lowerText = pageText.toLowerCase();
+
+    if (
+      lowerText.includes("we're sorry! no drawings are available at this time") ||
+      lowerText.includes("no drawings are available at this time") ||
+      lowerText.includes("please check back at midnight for more drawings")
+    ) {
+      console.log("ℹ️  No lotteries available at this time");
+      return {
+        success: false,
+        message: "No lotteries available at this time",
         reason: "closed",
       };
     }
 
-    // Navigate to lottery entry page if we found a URL
-    // If we clicked "Enter the lottery", we might already be on the form page
-    if (lotteryUrl && !enterLotteryClicked) {
-      console.log(`🔗 Navigating to lottery entry page: ${lotteryUrl}`);
-      await page.goto(lotteryUrl, { waitUntil: "networkidle", timeout: 60000 });
-      await handleCookieConsent(page);
-    }
+    // Filter shows - skip shows with num_tickets: 0
+    const showsToEnter = shows.filter((show) => {
+      const numTickets = show.num_tickets ?? userInfo.numberOfTickets;
+      return numTickets > 0;
+    });
 
-    // Wait a bit for form to appear (might be in iframe or main page)
-    await page.waitForTimeout(2000);
-
-    // Fill in the form (check iframe first, then main page)
-    let formFilled = false;
-    if (iframe) {
-      formFilled = await fillLotteryForm(iframe, userInfo);
-    }
-    if (!formFilled) {
-      formFilled = await fillLotteryForm(page, userInfo);
-    }
-    if (!formFilled) {
-      return {
-        success: false,
-        message: "Could not fill lottery form",
-        reason: "failed",
-      };
-    }
-
-    // Submit the form (check iframe first, then main page)
-    let submitted = false;
-    if (iframe) {
-      submitted = await submitForm(iframe);
-    }
-    if (!submitted) {
-      submitted = await submitForm(page);
-    }
-    if (!submitted) {
-      return {
-        success: false,
-        message: "Could not submit lottery form",
-        reason: "failed",
-      };
-    }
-
-    // Check for success indicators (check iframe first, then main page)
-    await page.waitForTimeout(2000);
-    let pageText = "";
-    if (iframe) {
-      pageText = (await iframe.textContent("body").catch(() => "")) || "";
-    }
-    if (!pageText) {
-      pageText = (await page.textContent("body").catch(() => "")) || "";
-    }
-    const lowerText = pageText.toLowerCase();
-
-    const hasSuccess =
-      lowerText.includes("thank you") ||
-      lowerText.includes("entry received") ||
-      lowerText.includes("successfully entered") ||
-      lowerText.includes("entry submitted");
-
-    if (hasSuccess) {
-      console.log("✅ Lottery entry submitted successfully");
+    if (showsToEnter.length === 0) {
+      console.log("ℹ️  No shows to enter (all shows have num_tickets: 0)");
       return {
         success: true,
-        message: "Lottery entry submitted successfully",
+        message: "No shows to enter (all disabled)",
         reason: "submitted",
       };
     }
 
-    // If we can't confirm success, assume it worked if we got this far
-    return {
-      success: true,
-      message: "Lottery entry submitted (confirmation unclear)",
-      reason: "submitted",
-    };
+    console.log(`\n🎯 Entering lotteries for ${showsToEnter.length} show(s) (${shows.length - showsToEnter.length} disabled)`);
+
+    // Enter lotteries for each enabled show
+    const results: Array<{ show: string; success: boolean; message: string }> = [];
+    let allSuccess = true;
+    let anySuccess = false;
+
+    for (const show of showsToEnter) {
+      const numTickets = (show.num_tickets || userInfo.numberOfTickets).toString();
+      const result = await enterLotteryForShow(iframe, show.name, numTickets);
+      
+      results.push({
+        show: show.name,
+        success: result.success,
+        message: result.message,
+      });
+
+      if (result.success) {
+        anySuccess = true;
+      } else {
+        allSuccess = false;
+      }
+
+      // Small delay between entries
+      await iframe.waitForTimeout(1000);
+    }
+
+    // Build result message
+    const successCount = results.filter((r) => r.success).length;
+    const totalCount = results.length;
+    const message = `Entered ${successCount}/${totalCount} lotteries: ${results
+      .map((r) => `${r.show} (${r.success ? "✓" : "✗"})`)
+      .join(", ")}`;
+
+    if (allSuccess) {
+      return {
+        success: true,
+        message,
+        reason: "submitted",
+      };
+    } else if (anySuccess) {
+      return {
+        success: true,
+        message,
+        reason: "submitted",
+      };
+    } else {
+      return {
+        success: false,
+        message,
+        reason: "failed",
+      };
+    }
   } catch (error) {
-    console.log(`❌ Error entering lottery: ${error}`);
+    console.log(`❌ Error entering lotteries: ${error}`);
     return {
       success: false,
       message: `Error: ${error}`,

@@ -3,6 +3,7 @@
 ## Current Structure Analysis
 
 ### Existing Files
+
 - **Workflow**: `.github/workflows/playwright.yml` - Runs all Playwright tests
 - **Test File**: `e2e/broadway-direct.spec.ts` - BroadwayDirect lottery tests
 - **Source File**: `src/broadway-direct.ts` - BroadwayDirect lottery logic
@@ -18,6 +19,7 @@
 **Current Issue**: The workflow runs `npx playwright test` which executes ALL tests in the `e2e/` directory.
 
 **Solution**:
+
 - Rename `playwright.yml` → `broadway-direct-lottery.yml`
 - Update test command to target specific file: `npx playwright test e2e/broadway-direct.spec.ts`
 - Create new `telecharge-lottery.yml` workflow that runs `npx playwright test e2e/telecharge.spec.ts`
@@ -27,6 +29,7 @@
 **Current**: `e2e/broadway-direct.spec.ts` (already well-named)
 
 **Needed**:
+
 - Keep `e2e/broadway-direct.spec.ts` for BroadwayDirect
 - Create `e2e/telecharge.spec.ts` for Telecharge lottery
 
@@ -35,12 +38,14 @@
 **Current**: `src/broadway-direct.ts` (already well-named)
 
 **Needed**:
+
 - Keep `src/broadway-direct.ts` for BroadwayDirect
 - Create `src/telecharge.ts` for Telecharge lottery logic
 
 ### 4. Shared Components
 
 These can remain shared across both lotteries:
+
 - ✅ `src/get-user-info.ts` - Both lotteries need user info
 - ✅ `src/types.ts` - May need to extend with Telecharge-specific types
 - ⚠️ `src/email-confirmation.ts` - Review if Telecharge uses different email patterns
@@ -70,4 +75,3 @@ These can remain shared across both lotteries:
 - `broadway-direct-lottery.yml` - BroadwayDirect lottery automation
 - `telecharge-lottery.yml` - Telecharge lottery automation
 - `tests.yml` - Unit tests (Jest)
-

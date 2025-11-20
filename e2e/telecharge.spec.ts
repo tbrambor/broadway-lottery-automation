@@ -12,7 +12,7 @@ chromium.use(stealth);
 
 interface ShowConfig {
   name: string;
-  url: string;
+  url?: string; // URL is optional now since we don't navigate to individual show pages
   num_tickets?: number;
 }
 
@@ -64,42 +64,71 @@ if (shows.length === 0) {
   }
 }
 
-shows.forEach((show) => {
-  test(`Enter lottery for ${show.name}`, async ({}, testInfo) => {
-    console.log(`\n🎭 Starting Telecharge lottery entry for: ${show.name}`);
-    console.log(`   URL: ${show.url}`);
-
-    const userInfo = getUserInfo(process.env);
-    const login = getTelechargeLogin(process.env);
-    const browser = await chromium.launch({
-      headless: process.env.CI ? true : false,
-    });
-
-    try {
-      const result = await telecharge({ browser, userInfo, login, url: show.url });
-
-      if (result.success) {
-        console.log(`✅ Successfully entered lottery for: ${show.name}`);
-      } else if (result.reason === "closed") {
-        console.log(`ℹ️  Lottery is closed for: ${show.name} - ${result.message}`);
-      } else {
-        console.log(`❌ Failed to enter lottery for: ${show.name} - ${result.message}`);
-      }
-
-      // Keep browser open for a bit to see the result (unless in CI or KEEP_BROWSER_OPEN is not set)
-      if (!process.env.CI && !process.env.KEEP_BROWSER_OPEN) {
-        console.log("⏳ Keeping browser open for 5 seconds to view results...");
-        await new Promise((resolve) => setTimeout(resolve, 5000));
-      } else if (process.env.KEEP_BROWSER_OPEN === "true") {
-        console.log("🔍 Browser will stay open. Press Ctrl+C to close.");
-        // Keep browser open indefinitely
-        await new Promise(() => {});
-      }
-    } finally {
-      if (browser) {
-        await browser.close();
-      }
-    }
+// Run a single test that enters all lotteries at once
+test("Enter all Telecharge lotteries", async ({}, testInfo) => {
+  const userInfo = getUserInfo(process.env);
+  
+  // Filter shows - only include those with num_tickets > 0
+  const enabledShows = shows.filter((show) => {
+    const numTickets = show.num_tickets ?? parseInt(userInfo.numberOfTickets);
+    return numTickets > 0;
   });
+  
+  const disabledShows = shows.filter((show) => {
+    const numTickets = show.num_tickets ?? parseInt(userInfo.numberOfTickets);
+    return numTickets === 0;
+  });
+
+  console.log(`\n🎭 Starting Telecharge lottery entry`);
+  console.log(`   Total shows in config: ${shows.length}`);
+  console.log(`   Enabled (will enter): ${enabledShows.length}`);
+  if (disabledShows.length > 0) {
+    console.log(`   Disabled (num_tickets: 0): ${disabledShows.length}`);
+    disabledShows.forEach((show) => {
+      console.log(`      - ${show.name}`);
+    });
+  }
+
+  if (enabledShows.length === 0) {
+    console.log("⚠️  No shows enabled. Set num_tickets > 0 to enter lotteries.");
+    return;
+  }
+
+  const login = getTelechargeLogin(process.env);
+  const browser = await chromium.launch({
+    headless: process.env.CI ? true : false,
+  });
+
+  try {
+    // Prepare shows list (only name and num_tickets are needed)
+    const showsToEnter = shows.map((show) => ({
+      name: show.name,
+      num_tickets: show.num_tickets,
+    }));
+
+    const result = await telecharge({ browser, userInfo, login, shows: showsToEnter });
+
+    if (result.success) {
+      console.log(`✅ ${result.message}`);
+    } else if (result.reason === "closed") {
+      console.log(`ℹ️  ${result.message}`);
+    } else {
+      console.log(`❌ ${result.message}`);
+    }
+
+    // Keep browser open for a bit to see the result (unless in CI or KEEP_BROWSER_OPEN is not set)
+    if (!process.env.CI && !process.env.KEEP_BROWSER_OPEN) {
+      console.log("⏳ Keeping browser open for 5 seconds to view results...");
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+    } else if (process.env.KEEP_BROWSER_OPEN === "true") {
+      console.log("🔍 Browser will stay open. Press Ctrl+C to close.");
+      // Keep browser open indefinitely
+      await new Promise(() => {});
+    }
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
 });
 

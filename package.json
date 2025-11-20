@@ -11,7 +11,10 @@
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
     "test:report": "playwright show-report",
-    "discover-telecharge": "tsx src/discover-telecharge-shows.ts"
+    "discover-telecharge": "tsx src/discover-telecharge-shows.ts",
+    "discover-broadway-direct": "tsx src/discover-broadway-direct-shows.ts",
+    "discover-all": "tsx src/discover-telecharge-shows.ts && tsx src/discover-broadway-direct-shows.ts",
+    "configure-shows": "tsx scripts/configure-shows.ts"
   },
   "repository": {
     "type": "git",

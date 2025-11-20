@@ -133,8 +133,29 @@ telecharge-headless: ## Run Telecharge lottery in headless mode. Use SHOWS=show1
 		CI=true SHOWS=$(SHOWS) npx playwright test e2e/telecharge.spec.ts; \
 	fi
 
-discover-telecharge: ## Discover Telecharge lottery shows from bwayrush.com and update showsToEnter.json
+discover-telecharge: ## Discover Telecharge lottery shows from bwayrush.com and update showsToEnter.json (preserves user preferences)
 	@echo "🔍 Discovering Telecharge lottery shows from bwayrush.com..."
 	@echo ""
 	@npx tsx src/discover-telecharge-shows.ts || (echo "⚠️  tsx not found. Installing..." && npm install --save-dev tsx && npx tsx src/discover-telecharge-shows.ts)
+
+discover-broadway-direct: ## Discover Broadway Direct lottery shows from bwayrush.com and update showsToEnter.json (preserves user preferences)
+	@echo "🔍 Discovering Broadway Direct lottery shows from bwayrush.com..."
+	@echo ""
+	@npx tsx src/discover-broadway-direct-shows.ts || (echo "⚠️  tsx not found. Installing..." && npm install --save-dev tsx && npx tsx src/discover-broadway-direct-shows.ts)
+
+discover-all: ## Discover shows for both Telecharge and Broadway Direct from bwayrush.com
+	@echo "🔍 Discovering all lottery shows from bwayrush.com..."
+	@echo ""
+	@echo "=== Telecharge Shows ==="
+	@make discover-telecharge
+	@echo ""
+	@echo "=== Broadway Direct Shows ==="
+	@make discover-broadway-direct
+	@echo ""
+	@echo "✅ Discovery complete!"
+
+configure-shows: ## Interactive tool to configure which shows to enter (supports both Telecharge and Broadway Direct)
+	@echo "🎭 Interactive Show Configuration"
+	@echo ""
+	@npx tsx scripts/configure-shows.ts || (echo "⚠️  tsx not found. Installing..." && npm install --save-dev tsx && npx tsx scripts/configure-shows.ts)
 

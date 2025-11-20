@@ -3,7 +3,7 @@
     "name": "Art",
     "url": "https://artonbroadway.com/",
     "lotteryUrl": "https://my.socialtoaster.com/st/lottery_select/?key=BROADWAY&source=iframe",
-    "num_tickets": 2
+    "num_tickets": 0
   },
   {
     "name": "Buena Vista Social Club",
@@ -15,7 +15,7 @@
     "name": "Chess",
     "url": "https://chessbroadway.com/",
     "lotteryUrl": "https://my.socialtoaster.com/st/lottery_select/?key=BROADWAY&source=iframe",
-    "num_tickets": 2
+    "num_tickets": 0
   },
   {
     "name": "The Great Gatsby",
@@ -27,19 +27,19 @@
     "name": "Hell's Kitchen",
     "url": "https://www.hellskitchen.com/",
     "lotteryUrl": "https://my.socialtoaster.com/st/lottery_select/?key=BROADWAY",
-    "num_tickets": 2
+    "num_tickets": 0
   },
   {
     "name": "Liberation",
     "url": "https://liberationbway.com/",
     "lotteryUrl": "https://my.socialtoaster.com/st/lottery_select/?key=BROADWAY&source=iframe",
-    "num_tickets": 2
+    "num_tickets": 0
   },
   {
     "name": "Little Bear Ridge Road",
     "url": "https://littlebearridgeroad.com/",
     "lotteryUrl": "https://my.socialtoaster.com/st/lottery_select/?key=BROADWAY",
-    "num_tickets": 2
+    "num_tickets": 0
   },
   {
     "name": "Mamma Mia!",
@@ -51,7 +51,7 @@
     "name": "Oh, Mary!",
     "url": "https://www.ohmaryplay.com/",
     "lotteryUrl": "https://my.socialtoaster.com/st/lottery_select/?key=BROADWAY&source=iframe",
-    "num_tickets": 2
+    "num_tickets": 0
   },
   {
     "name": "Operation Mincemeat",
@@ -69,12 +69,12 @@
     "name": "Ragtime",
     "url": "https://www.lct.org/shows/ragtime/",
     "lotteryUrl": "https://my.socialtoaster.com/st/lottery_select/?key=BROADWAY&source=iframe",
-    "num_tickets": 2
+    "num_tickets": 0
   },
   {
     "name": "Two Strangers (Carry a Cake Across New York)",
     "url": "https://twostrangersmusical.com/",
     "lotteryUrl": "https://my.socialtoaster.com/st/lottery_select/?key=BROADWAY&source=iframe",
-    "num_tickets": 2
+    "num_tickets": 0
   }
 ]
