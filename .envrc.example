@@ -1,9 +1,10 @@
-# Broadway Lottery - Environment Variables for direnv
+# Broadway Lottery Automation - Environment Variables for direnv
 # Copy this file to .envrc and fill in your information
 # The .envrc file is gitignored and won't be committed
 #
 # After creating .envrc, run: direnv allow
 
+# Required for both lotteries
 export FIRST_NAME="Your First Name"
 export LAST_NAME="Your Last Name"
 export NUMBER_OF_TICKETS="2"
@@ -13,6 +14,10 @@ export DOB_DAY="15"
 export DOB_YEAR="1990"
 export ZIP="10001"
 export COUNTRY="USA"
+
+# Required for Telecharge lottery (login credentials)
+export TELECHARGE_EMAIL="your.telecharge.email@example.com"
+export TELECHARGE_PASSWORD="your_telecharge_password"
 
 # Optional: Filter to specific shows (comma-separated)
 # Examples: "aladdin,wicked" or "six-ny" or leave unset to test all shows
