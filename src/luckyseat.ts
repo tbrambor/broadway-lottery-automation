@@ -22,11 +22,24 @@ async function loginToLuckySeat(
 
     // Wait for Angular app to load
     console.log("⏳ Waiting for Angular app to load...");
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(5000);
 
     // Wait for the login form to be visible
-    await page.waitForSelector('input[placeholder="Email"]', { timeout: 30000 });
-    console.log("✅ Login form loaded");
+    try {
+      await page.waitForSelector('input[placeholder="Email"]', { timeout: 60000 });
+      console.log("✅ Login form loaded");
+    } catch (error) {
+      console.log("❌ Login form did not load in time");
+      console.log(`   Current URL: ${page.url()}`);
+      // Take a screenshot for debugging
+      try {
+        await page.screenshot({ path: 'login-timeout-debug.png', fullPage: true });
+        console.log("   Screenshot saved to login-timeout-debug.png");
+      } catch (screenshotError) {
+        console.log(`   Could not save screenshot: ${screenshotError}`);
+      }
+      throw error;
+    }
 
     // Fill in email field
     console.log("📧 Filling email field...");

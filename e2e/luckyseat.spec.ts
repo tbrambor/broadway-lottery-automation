@@ -97,6 +97,18 @@ test("Enter all Lucky Seat lotteries", async ({}, testInfo) => {
   const login = getLuckySeatLogin(process.env);
   const browser = await chromium.launch({
     headless: process.env.CI ? true : false,
+    args: process.env.CI
+      ? [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu',
+          '--disable-blink-features=AutomationControlled',
+        ]
+      : [],
   });
 
   try {

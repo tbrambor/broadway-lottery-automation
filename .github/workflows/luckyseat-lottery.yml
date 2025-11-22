@@ -38,7 +38,15 @@ jobs:
       - name: Run Lucky Seat lottery
         env:
           CI: true
+          FIRST_NAME: ${{ secrets.FIRST_NAME }}
+          LAST_NAME: ${{ secrets.LAST_NAME }}
           NUMBER_OF_TICKETS: ${{ secrets.NUMBER_OF_TICKETS }}
+          EMAIL: ${{ secrets.EMAIL }}
+          DOB_MONTH: ${{ secrets.DOB_MONTH }}
+          DOB_DAY: ${{ secrets.DOB_DAY }}
+          DOB_YEAR: ${{ secrets.DOB_YEAR }}
+          ZIP: ${{ secrets.ZIP }}
+          COUNTRY: ${{ secrets.COUNTRY }}
           LUCKYSEAT_EMAIL: ${{ secrets.LUCKYSEAT_EMAIL }}
           LUCKYSEAT_PASSWORD: ${{ secrets.LUCKYSEAT_PASSWORD }}
           CAPTCHA_API_KEY: ${{ secrets.CAPTCHA_API_KEY }}
@@ -49,7 +57,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-luckyseat
-          path: playwright-report/
+          path: |
+            playwright-report/
+            *.png
           retention-days: 30
           compression-level: 6
           overwrite: true
